@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Variables de entorno (contienen webhooks de Discord y secretos HMAC)
+.env
+.env.*
+!.env.example
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs locales y artefactos de ejecución
+*.log
+.functions-framework/
+
+# Payloads reales capturados en debugging (pueden contener PII)
+samples/
+*_real.json
+*_real.txt

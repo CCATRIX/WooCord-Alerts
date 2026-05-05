@@ -1,0 +1,144 @@
+{
+  "info": {
+    "name": "Test Webhooks (WooCommerce + Monei)",
+    "description": "Colección de pruebas para WooCord Alerts. Define la variable de entorno `cloud_function_url` (p. ej. http://localhost:8080 para pruebas locales con functions-framework). Todos los datos son ficticios.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "cloud_function_url",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Nuevo Cliente (WC)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-WC-Webhook-Topic", "value": "customer.created", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 1001,\n  \"first_name\": \"Ana\",\n  \"last_name\": \"Gómez\",\n  \"email\": \"ana.gomez@example.com\",\n  \"username\": \"anag\"\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
+      "name": "2. Pedido Procesando (WC)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-WC-Webhook-Topic", "value": "order.updated", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 9005,\n  \"status\": \"processing\",\n  \"total\": \"299.99\",\n  \"currency\": \"EUR\",\n  \"date_modified\": \"2026-05-04T15:30:00\",\n  \"billing\": {\n    \"first_name\": \"Carlos\",\n    \"last_name\": \"Ruiz\",\n    \"email\": \"carlos.ruiz@example.com\",\n    \"phone\": \"+34 600 000 000\"\n  },\n  \"shipping\": {\n    \"first_name\": \"María\",\n    \"last_name\": \"Ruiz\",\n    \"address_1\": \"Av. Principal 45, Piso 2\",\n    \"city\": \"Madrid\",\n    \"state\": \"Madrid\",\n    \"phone\": \"\"\n  },\n  \"line_items\": [\n    { \"name\": \"Monitor 4K 27 pulgadas\", \"quantity\": 1, \"sku\": \"MON-4K-27\" }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
+      "name": "3. Pedido Pendiente (Ignorado)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-WC-Webhook-Topic", "value": "order.created", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 9006,\n  \"status\": \"pending\",\n  \"total\": \"50.00\",\n  \"currency\": \"EUR\",\n  \"date_modified\": \"2026-05-04T15:35:00\",\n  \"billing\": {\n    \"first_name\": \"Luis\",\n    \"last_name\": \"Pérez\",\n    \"email\": \"luis@example.com\",\n    \"phone\": \"+34 611 111 111\"\n  },\n  \"shipping\": {},\n  \"line_items\": []\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
+      "name": "4. Pago Exitoso (Monei)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"00000000000000000000000000000000\",\n  \"type\": \"charge.succeeded\",\n  \"livemode\": false,\n  \"accountId\": \"00000000-0000-0000-0000-000000000000\",\n  \"objectType\": \"charge\",\n  \"objectId\": \"0000000000000000000000000000000000000000\",\n  \"createdAt\": 1700000000,\n  \"object\": {\n    \"id\": \"0000000000000000000000000000000000000000\",\n    \"accountId\": \"00000000-0000-0000-0000-000000000000\",\n    \"amount\": 5065,\n    \"currency\": \"EUR\",\n    \"customer\": {\n      \"phone\": \"+340000000000\",\n      \"name\": \"Cliente Ejemplo\",\n      \"email\": \"cliente@example.com\"\n    },\n    \"orderId\": \"000000000000\",\n    \"paymentMethod\": {\n      \"method\": \"card\",\n      \"card\": {\n        \"country\": \"ES\",\n        \"last4\": \"0000\",\n        \"type\": \"debit\",\n        \"brand\": \"mastercard\"\n      }\n    },\n    \"shop\": { \"country\": \"ES\", \"name\": \"mitienda\" },\n    \"status\": \"SUCCEEDED\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
+      "name": "5. Pedido GRANDE (>1024 chars productos)",
+      "description": "30 líneas de productos para forzar la truncación del campo de productos (límite Discord: 1024 chars en `value`). Debe verse '... y N producto(s) más' al final.",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-WC-Webhook-Topic", "value": "order.updated", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 9999,\n  \"status\": \"processing\",\n  \"total\": \"482.30\",\n  \"currency\": \"EUR\",\n  \"date_modified\": \"2026-05-05T10:00:00\",\n  \"billing\": {\n    \"first_name\": \"Pedido\",\n    \"last_name\": \"Mayorista\",\n    \"email\": \"mayorista@example.com\",\n    \"phone\": \"+34 600 111 222\"\n  },\n  \"shipping\": {\n    \"first_name\": \"Almacén\",\n    \"last_name\": \"Central\",\n    \"address_1\": \"Polígono Industrial Nave 7\",\n    \"city\": \"Getafe\",\n    \"state\": \"Madrid\",\n    \"phone\": \"+34 600 999 888\"\n  },\n  \"line_items\": [\n    { \"name\": \"Detergente concentrado LUPE MARSELLA 2.6L\", \"quantity\": 4, \"sku\": \"HFV01074\" },\n    { \"name\": \"Suavizante Mimosín Azul Cielo 4L\", \"quantity\": 2, \"sku\": \"HFV01075\" },\n    { \"name\": \"Lavavajillas Fairy Limón 1L\", \"quantity\": 6, \"sku\": \"HFV01076\" },\n    { \"name\": \"Lejía Conejo Tradicional 2L\", \"quantity\": 3, \"sku\": \"HFV01077\" },\n    { \"name\": \"Limpiador multiusos KH-7 750ml\", \"quantity\": 5, \"sku\": \"HFV01078\" },\n    { \"name\": \"Papel higiénico Scottex 24 rollos\", \"quantity\": 2, \"sku\": \"HFV01079\" },\n    { \"name\": \"Rollo de cocina Colhogar 6 unidades\", \"quantity\": 3, \"sku\": \"HFV01080\" },\n    { \"name\": \"Bolsas basura Albal 30L pack 30\", \"quantity\": 4, \"sku\": \"HFV01081\" },\n    { \"name\": \"Esponja Scotch-Brite estropajo pack 5\", \"quantity\": 2, \"sku\": \"HFV01082\" },\n    { \"name\": \"Friegasuelos Don Limpio Floral 1.3L\", \"quantity\": 3, \"sku\": \"HFV01083\" },\n    { \"name\": \"Limpiacristales Cristasol 750ml\", \"quantity\": 2, \"sku\": \"HFV01084\" },\n    { \"name\": \"Desengrasante cocina Cif 750ml\", \"quantity\": 2, \"sku\": \"HFV01085\" },\n    { \"name\": \"Limpiador WC Harpic Power Plus 750ml\", \"quantity\": 4, \"sku\": \"HFV01086\" },\n    { \"name\": \"Ambientador Glade lavanda 300ml\", \"quantity\": 3, \"sku\": \"HFV01087\" },\n    { \"name\": \"Detergente lavavajillas Finish pastillas x60\", \"quantity\": 1, \"sku\": \"HFV01088\" },\n    { \"name\": \"Sal lavavajillas Finish 2kg\", \"quantity\": 2, \"sku\": \"HFV01089\" },\n    { \"name\": \"Abrillantador Finish Shine 800ml\", \"quantity\": 1, \"sku\": \"HFV01090\" },\n    { \"name\": \"Quitamanchas Vanish Oxi Action 1L\", \"quantity\": 2, \"sku\": \"HFV01091\" },\n    { \"name\": \"Detergente Dixan polvo 4kg\", \"quantity\": 1, \"sku\": \"HFV01092\" },\n    { \"name\": \"Suavizante Flor concentrado 2.4L\", \"quantity\": 1, \"sku\": \"HFV01093\" },\n    { \"name\": \"Toallitas húmedas Dodot pack 60\", \"quantity\": 3, \"sku\": \"HFV01094\" },\n    { \"name\": \"Pañales Dodot talla 4 pack 56\", \"quantity\": 1, \"sku\": \"HFV01095\" },\n    { \"name\": \"Gel ducha Sanex 600ml\", \"quantity\": 4, \"sku\": \"HFV01096\" },\n    { \"name\": \"Champú Pantene Pro-V 675ml\", \"quantity\": 2, \"sku\": \"HFV01097\" },\n    { \"name\": \"Acondicionador Pantene 360ml\", \"quantity\": 2, \"sku\": \"HFV01098\" },\n    { \"name\": \"Pasta dental Colgate Total 75ml\", \"quantity\": 6, \"sku\": \"HFV01099\" },\n    { \"name\": \"Cepillo dental Oral-B Pro Expert pack 4\", \"quantity\": 1, \"sku\": \"HFV01100\" },\n    { \"name\": \"Desodorante Rexona Cobalt 200ml\", \"quantity\": 3, \"sku\": \"HFV01101\" },\n    { \"name\": \"Crema corporal Nivea Soft 300ml\", \"quantity\": 2, \"sku\": \"HFV01102\" },\n    { \"name\": \"Loción solar Garnier SPF50 200ml\", \"quantity\": 1, \"sku\": \"HFV01103\" }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
+      "name": "6. Ping WooCommerce",
+      "description": "WooCommerce envía este ping al registrar el webhook. Debe responder 200 inmediatamente sin tocar Discord.",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-WC-Webhook-Topic", "value": "webhook.ping", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"webhook_id\": 42}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
+      "name": "7. Firma WooCommerce inválida (401)",
+      "description": "Solo aplica si has configurado WC_WEBHOOK_SECRET. Debe devolver 401 y NO publicar en Discord.",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-WC-Webhook-Topic", "value": "order.updated", "type": "text" },
+          { "key": "X-WC-Webhook-Signature", "value": "ZmlybWFfbm9fdmFsaWRhX3RvdGFsbWVudGU=", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 9007,\n  \"status\": \"processing\",\n  \"total\": \"10.00\",\n  \"currency\": \"EUR\",\n  \"billing\": {\"first_name\": \"Sospechoso\", \"last_name\": \"\", \"email\": \"x@example.com\", \"phone\": \"\"},\n  \"shipping\": {},\n  \"line_items\": []\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    }
+  ]
+}
