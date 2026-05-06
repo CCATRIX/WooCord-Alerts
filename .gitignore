@@ -31,7 +31,12 @@ Thumbs.db
 *.log
 .functions-framework/
 
-# Payloads reales capturados en debugging (pueden contener PII)
+# Capturas de webhooks reales (pueden contener PII de clientes — anonimizar
+# antes de commitear con `git add -f` si fuera necesario).
 samples/
+captures/
+*webhook*.txt
+*payload*.txt
 *_real.json
 *_real.txt
+"Ejemplos*.txt"

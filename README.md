@@ -45,7 +45,30 @@ Una función Serverless (Google Cloud Functions) escrita en **Python** que inter
 Si utilizas Monei como pasarela, puedes recibir notificaciones de pagos directamente:
 1. Ve al panel de control de Monei > Configuración > Webhooks.
 2. Pega la misma URL de tu Google Cloud Function.
-3. El código detectará automáticamente que es un pago (`charge.succeeded`) y lo enviará al canal configurado en `DISCORD_WEBHOOK_PAGOS`.
+3. El código detectará automáticamente los eventos relevantes y los enviará al canal configurado en `DISCORD_WEBHOOK_PAGOS`.
+
+### Ciclo de vida de un pago en Monei
+
+Un mismo pedido genera **varios webhooks** mientras Monei lo procesa. Estos son los `type` típicos del ciclo:
+
+| `type` | `status` interno | Significado | ¿Procesado por WooCord? |
+|--------|------------------|-------------|--------------------------|
+| `charge.created`             | `CREATED`             | Se creó el cargo (al iniciar el checkout). | ❌ Ignorado |
+| `charge.pending`             | `PENDING`             | El cliente abrió el formulario de pago. Aún no hay tarjeta. | ❌ Ignorado |
+| `charge.pending_processing`  | `PENDING_PROCESSING`  | Tarjeta enviada, esperando autorización (3DS, banco). | ❌ Ignorado |
+| **`charge.succeeded`**       | `SUCCEEDED` (`E000`)  | **Pago aprobado y fondos confirmados.**                   | ✅ **Embed verde a Discord** |
+| **`charge.failed`**          | `FAILED`              | **Pago rechazado por el banco o 3DS.**                    | ✅ **Embed rojo a Discord** |
+| `charge.canceled`            | `CANCELED`            | Pago cancelado antes de ejecutarse. | ❌ Ignorado |
+| `charge.expired`             | `EXPIRED`             | El pago caducó sin completarse. | ❌ Ignorado |
+| `charge.refunded`            | `REFUNDED`            | Pago reembolsado por completo. | ❌ Ignorado |
+| `charge.partially_refunded`  | `PARTIALLY_REFUNDED`  | Reembolso parcial. | ❌ Ignorado |
+
+> **¿Por qué solo `succeeded` y `failed`?**
+> 1. **Evita duplicados:** un mismo pedido emite 3 eventos (`pending` → `pending_processing` → `succeeded`); si todos publicaran en Discord verías el cobro tres veces.
+> 2. **Evita falsos positivos:** `pending_processing` no garantiza que el dinero llegue — el banco puede rechazar el 3DS al final. Solo `succeeded` con `statusCode: E000` confirma fondos.
+> 3. **`failed` es accionable:** te interesa porque puedes contactar al cliente para reintentar (tarjeta sin fondos, 3DS rechazado, etc.). El embed incluye `statusCode` y `statusMessage` del banco para diagnosticar.
+>
+> ¿Quieres notificar también reembolsos o expiraciones? Crea un nuevo formateador (`format_payment_refunded_notification`, etc.) y regístralo en el dict `MONEI_FORMATTERS` de `main.py` — el resto del flujo lo toma automáticamente.
 
 ## 📂 Archivos del Proyecto
 
@@ -138,13 +161,52 @@ Los siguientes JSON son ejemplos **anonimizados** del formato real que envían W
 }
 ```
 
-### Monei — `charge.pending_processing` (ignorado por el código actual)
+### Monei — `charge.failed` (procesado con embed rojo)
+
+```json
+{
+  "id": "00000000000000000000000000000001",
+  "type": "charge.failed",
+  "livemode": false,
+  "accountId": "00000000-0000-0000-0000-000000000000",
+  "objectType": "charge",
+  "objectId": "0000000000000000000000000000000000000001",
+  "createdAt": 1700000100,
+  "object": {
+    "id": "0000000000000000000000000000000000000001",
+    "amount": 2480,
+    "currency": "EUR",
+    "customer": {
+      "phone": "+340000000000",
+      "name": "NOMBRE APELLIDO",
+      "email": "cliente@example.com"
+    },
+    "orderId": "000000000001",
+    "paymentMethod": {
+      "method": "card",
+      "card": {
+        "country": "ES",
+        "last4": "0000",
+        "type": "credit",
+        "brand": "visa"
+      }
+    },
+    "shop": { "country": "ES", "name": "mitienda" },
+    "status": "FAILED",
+    "statusCode": "E101",
+    "statusMessage": "Insufficient funds"
+  }
+}
+```
+
+### Monei — `charge.pending_processing` (ignorado por el código)
 
 ```json
 {
   "id": "00000000000000000000000000000000",
   "type": "charge.pending_processing",
   "livemode": true,
+  "accountId": "00000000-0000-0000-0000-000000000000",
   "objectType": "charge",
   "object": {
     "amount": 5065,
@@ -154,6 +216,18 @@ Los siguientes JSON son ejemplos **anonimizados** del formato real que envían W
       "name": "NOMBRE APELLIDO",
       "email": "cliente@example.com"
     },
+    "billingDetails": {
+      "address": { "zip": "00000", "country": "ES", "city": "Ciudad", "line1": "Calle Ejemplo 1" },
+      "phone": "+340000000000",
+      "name": "NOMBRE APELLIDO",
+      "email": "cliente@example.com"
+    },
+    "shippingDetails": {
+      "address": { "country": "ES", "city": "Ciudad", "line1": "Calle Envío 1" },
+      "name": "NOMBRE DESTINATARIO",
+      "email": "cliente@example.com"
+    },
+    "description": "mitienda - #1001",
     "orderId": "000000000000",
     "status": "PENDING_PROCESSING"
   }

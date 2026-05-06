@@ -83,6 +83,24 @@
       }
     },
     {
+      "name": "4b. Pago Fallido (Monei)",
+      "description": "charge.failed: el banco rechazó la tarjeta. El embed debe llegar en rojo con `statusCode` + `statusMessage`.",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"00000000000000000000000000000001\",\n  \"type\": \"charge.failed\",\n  \"livemode\": false,\n  \"accountId\": \"00000000-0000-0000-0000-000000000000\",\n  \"objectType\": \"charge\",\n  \"objectId\": \"0000000000000000000000000000000000000001\",\n  \"createdAt\": 1700000100,\n  \"object\": {\n    \"id\": \"0000000000000000000000000000000000000001\",\n    \"amount\": 2480,\n    \"currency\": \"EUR\",\n    \"customer\": {\n      \"phone\": \"+340000000000\",\n      \"name\": \"Cliente Ejemplo\",\n      \"email\": \"cliente@example.com\"\n    },\n    \"orderId\": \"000000000001\",\n    \"paymentMethod\": {\n      \"method\": \"card\",\n      \"card\": {\n        \"country\": \"ES\",\n        \"last4\": \"0000\",\n        \"type\": \"credit\",\n        \"brand\": \"visa\"\n      }\n    },\n    \"shop\": { \"country\": \"ES\", \"name\": \"mitienda\" },\n    \"status\": \"FAILED\",\n    \"statusCode\": \"E101\",\n    \"statusMessage\": \"Insufficient funds\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
       "name": "5. Pedido GRANDE (>1024 chars productos)",
       "description": "30 líneas de productos para forzar la truncación del campo de productos (límite Discord: 1024 chars en `value`). Debe verse '... y N producto(s) más' al final.",
       "request": {

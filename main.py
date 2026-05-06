@@ -140,7 +140,7 @@ def format_order_processing(data):
 # 3. PARSEADORES DE PASARELAS DE PAGO (MODULAR)
 # ==========================================
 def parse_monei_payload(data):
-    """Extrae y normaliza los datos del JSON de Monei."""
+    """Extrae y normaliza los datos del JSON de Monei (succeeded o failed)."""
     obj = data.get("object") or {}
     customer = obj.get("customer") or {}
     card = (obj.get("paymentMethod") or {}).get("card") or {}
@@ -150,6 +150,7 @@ def parse_monei_payload(data):
 
     return {
         "processor": "Monei",
+        "event_type": data.get("type", ""),
         "is_live": bool(data.get("livemode", False)),
         "order_id": obj.get("orderId", "N/A"),
         "amount": amount_formatted,
@@ -157,11 +158,14 @@ def parse_monei_payload(data):
         "customer_name": customer.get("name", "N/A"),
         "customer_email": customer.get("email", "N/A"),
         "customer_phone": customer.get("phone", "N/A"),
-        "payment_type": f"{card.get('brand', 'Desconocida').capitalize()} ({card.get('type', 'desconocido').capitalize()})"
+        "payment_type": f"{card.get('brand', 'Desconocida').capitalize()} ({card.get('type', 'desconocido').capitalize()})",
+        "status_code": obj.get("statusCode") or "N/A",
+        "status_message": obj.get("statusMessage") or "Sin descripción",
     }
 
 
 def format_payment_notification(parsed_data):
+    """Pago aprobado — embed verde."""
     env_indicator = "🟢 PRODUCCIÓN" if parsed_data["is_live"] else "🟠 PRUEBAS"
 
     return {
@@ -177,6 +181,36 @@ def format_payment_notification(parsed_data):
             "footer": {"text": f"Entorno: {env_indicator}"}
         }]
     }
+
+
+def format_payment_failed_notification(parsed_data):
+    """Pago fallido — embed rojo, incluye código + mensaje del banco para que el comercio
+    pueda contactar al cliente y reintentar el cobro."""
+    env_indicator = "🟢 PRODUCCIÓN" if parsed_data["is_live"] else "🟠 PRUEBAS"
+
+    return {
+        "content": f"⚠️ **PAGO FALLIDO** ({parsed_data['processor']})",
+        "embeds": [{
+            "color": 15548997,  # rojo Discord
+            "fields": [
+                {"name": "💰 Monto", "value": f"**{parsed_data['amount']} {parsed_data['currency']}**", "inline": True},
+                {"name": "🛒 Id_Order", "value": f"#{parsed_data['order_id']}", "inline": True},
+                {"name": "💳 Método", "value": parsed_data['payment_type'], "inline": True},
+                {"name": "❌ Motivo del rechazo", "value": f"`{parsed_data['status_code']}` — {parsed_data['status_message']}", "inline": False},
+                {"name": "👤 Cliente", "value": f"{parsed_data['customer_name']}\n📧 {parsed_data['customer_email']}\n📱 {parsed_data['customer_phone']}", "inline": False}
+            ],
+            "footer": {"text": f"Contacta al cliente para reintentar el cobro · Entorno: {env_indicator}"}
+        }]
+    }
+
+
+# Dispatcher: qué `type` de Monei se enrutan a qué formateador.
+# Para añadir más eventos (charge.refunded, charge.canceled, etc.) basta con
+# crear un nuevo formateador y registrarlo aquí — el ciclo es idéntico.
+MONEI_FORMATTERS = {
+    "charge.succeeded": format_payment_notification,
+    "charge.failed": format_payment_failed_notification,
+}
 
 
 # ==========================================
@@ -243,11 +277,12 @@ def main_webhook_receiver(request):
     if not payload:
         return "Webhook ignorado (sin payload)", 200
 
-    # Detección Monei: tipo de evento + accountId presente (campo único de su API)
-    if payload.get("type") == "charge.succeeded" and payload.get("accountId"):
+    # Detección Monei: tipo soportado + accountId presente (campo único de su API)
+    monei_type = payload.get("type")
+    if monei_type in MONEI_FORMATTERS and payload.get("accountId"):
         monei_signature = request.headers.get("MONEI-Signature", "")
         if not verify_monei_signature(raw_body, monei_signature):
-            log.warning("Firma Monei inválida (id=%s)", payload.get("id"))
+            log.warning("Firma Monei inválida (id=%s, type=%s)", payload.get("id"), monei_type)
             return "Firma inválida", 401
 
         if not DISCORD_WEBHOOK_PAGOS:
@@ -255,9 +290,11 @@ def main_webhook_receiver(request):
             return "Configuración incompleta", 500
 
         parsed_data = parse_monei_payload(payload)
-        discord_payload = format_payment_notification(parsed_data)
-        send_to_discord(DISCORD_WEBHOOK_PAGOS, discord_payload, "Monei")
-        return "Procesado Monei", 200
+        formatter = MONEI_FORMATTERS[monei_type]
+        discord_payload = formatter(parsed_data)
+        send_to_discord(DISCORD_WEBHOOK_PAGOS, discord_payload, f"Monei:{monei_type}")
+        return f"Procesado Monei {monei_type}", 200
 
-    log.info("Webhook ignorado (formato no reconocido): keys=%s", list(payload.keys())[:10])
+    log.info("Webhook ignorado (formato no reconocido o type Monei no manejado): type=%s",
+             payload.get("type"))
     return "Webhook ignorado (Formato no reconocido)", 200
