@@ -173,6 +173,56 @@ Los siguientes JSON son ejemplos **anonimizados** del formato real que envían W
 }
 ```
 
+### Monei — `charge.succeeded` con método **Bizum**
+
+A diferencia de las tarjetas, en pagos por Bizum el bloque relevante es
+`object.paymentMethod.bizum` (no `.card`). El formateador detecta el método
+por `paymentMethod.method` y muestra `Bizum (IBAN ····XXXX)` cuando
+`ibanLast4` está disponible.
+
+```json
+{
+  "id": "00000000000000000000000000000002",
+  "type": "charge.succeeded",
+  "livemode": true,
+  "accountId": "00000000-0000-0000-0000-000000000000",
+  "objectType": "charge",
+  "objectId": "0000000000000000000000000000000000000002",
+  "createdAt": 1700000200,
+  "object": {
+    "id": "0000000000000000000000000000000000000002",
+    "accountId": "00000000-0000-0000-0000-000000000000",
+    "createdAt": 1700000150,
+    "updatedAt": 1700000200,
+    "amount": 1000,
+    "authorizationCode": "000000",
+    "currency": "EUR",
+    "customer": {
+      "phone": "+340000000000",
+      "name": "NOMBRE APELLIDO",
+      "email": "cliente@example.com"
+    },
+    "description": "mitienda - #1002",
+    "livemode": true,
+    "orderId": "000000000002",
+    "paymentMethod": {
+      "method": "bizum",
+      "bizum": {
+        "remember": true,
+        "phoneNumber": "+340000000000",
+        "integrationType": "REST",
+        "idBizum": "00000000000000000000000000000000000",
+        "ibanLast4": "0000"
+      }
+    },
+    "shop": { "country": "ES", "name": "mitienda" },
+    "status": "SUCCEEDED",
+    "statusCode": "E000",
+    "statusMessage": "Transaction approved"
+  }
+}
+```
+
 ### Monei — `charge.failed` (procesado con embed rojo)
 
 ```json

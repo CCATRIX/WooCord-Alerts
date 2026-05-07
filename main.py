@@ -139,11 +139,36 @@ def format_order_processing(data):
 # ==========================================
 # 3. PARSEADORES DE PASARELAS DE PAGO (MODULAR)
 # ==========================================
+def _format_payment_method(payment_method):
+    """Descripción legible del método de pago de Monei (card, bizum, ...).
+    Degrada al nombre del método para tipos no contemplados en lugar de
+    devolver 'Desconocida (Desconocido)'."""
+    pm = payment_method or {}
+    method = pm.get("method") or ""
+
+    if method == "card":
+        card = pm.get("card") or {}
+        brand = (card.get("brand") or "Desconocida").capitalize()
+        ctype = (card.get("type") or "desconocido").capitalize()
+        return f"{brand} ({ctype})"
+
+    if method == "bizum":
+        bizum = pm.get("bizum") or {}
+        iban_last4 = bizum.get("ibanLast4")
+        return f"Bizum (IBAN ····{iban_last4})" if iban_last4 else "Bizum"
+
+    if method:
+        # paypal, applepay, googlepay, multibanco, etc.: al menos preservamos
+        # el nombre del método en lugar de devolver 'Desconocido'.
+        return method.replace("_", " ").title()
+
+    return "Desconocido"
+
+
 def parse_monei_payload(data):
     """Extrae y normaliza los datos del JSON de Monei (succeeded o failed)."""
     obj = data.get("object") or {}
     customer = obj.get("customer") or {}
-    card = (obj.get("paymentMethod") or {}).get("card") or {}
 
     amount_raw = obj.get("amount") or 0
     amount_formatted = f"{amount_raw / 100:.2f}"
@@ -158,7 +183,7 @@ def parse_monei_payload(data):
         "customer_name": customer.get("name", "N/A"),
         "customer_email": customer.get("email", "N/A"),
         "customer_phone": customer.get("phone", "N/A"),
-        "payment_type": f"{card.get('brand', 'Desconocida').capitalize()} ({card.get('type', 'desconocido').capitalize()})",
+        "payment_type": _format_payment_method(obj.get("paymentMethod")),
         "status_code": obj.get("statusCode") or "N/A",
         "status_message": obj.get("statusMessage") or "Sin descripción",
     }
@@ -237,6 +262,10 @@ WC_MAPPER = {
     "customer.created": format_customer_created,
     "order.created": format_order_processing,
     "order.updated": format_order_processing,
+    # Webhook con tipo "Acción Personalizada" + hook woocommerce_order_status_processing.
+    # Solo dispara una vez por pedido al entrar en `processing`, evitando los
+    # duplicados que generan plugins como YayCurrency al actualizar la orden.
+    "action.woocommerce_order_status_processing": format_order_processing,
 }
 
 
