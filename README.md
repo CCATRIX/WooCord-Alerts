@@ -40,6 +40,18 @@ Una función Serverless (Google Cloud Functions) escrita en **Python** que inter
    * Pedido creado (`order.created`)
    * Pedido actualizado (`order.updated`)
 
+> ⚠️ **Nota sobre notificaciones duplicadas (`order.updated`)**
+>
+> Puede ocurrir que WooCommerce envíe notificaciones duplicadas porque plugins secundarios (como **YayCurrency**, conversores de divisa, plugins de stock, sincronizadores de ERP, etc.) actualizan datos internos del pedido en segundo plano, lo que dispara repetidamente el evento `order.updated`. Esto puede provocar que tu canal de Discord se llene de mensajes spam idénticos por cada pequeña modificación automática que sufra la compra mientras siga en estado `processing`.
+>
+> **Solución de raíz:** en los ajustes del webhook de WooCommerce, en lugar de seleccionar el tema *Pedido actualizado*, cambia el **Tema** a **Acción Personalizada** (*Custom Action*) y escribe:
+>
+> ```
+> woocommerce_order_status_processing
+> ```
+>
+> Así el aviso se enviará **una única vez**, justo en el instante en que el pedido alcanza el estado `processing`, ignorando cualquier actualización posterior provocada por otros plugins.
+
 ## 💳 Configuración en Monei (Opcional)
 
 Si utilizas Monei como pasarela, puedes recibir notificaciones de pagos directamente:
