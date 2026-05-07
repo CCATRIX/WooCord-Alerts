@@ -48,6 +48,25 @@
       }
     },
     {
+      "name": "2b. Pedido vía Acción Personalizada (WC)",
+      "description": "Webhook tipo 'Custom Action' con hook `woocommerce_order_status_processing`. WooCommerce envía la cabecera `X-WC-Webhook-Topic: action.woocommerce_order_status_processing`. Solo dispara una vez por pedido (al entrar en processing), evitando duplicados causados por plugins tipo YayCurrency.",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-WC-Webhook-Topic", "value": "action.woocommerce_order_status_processing", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 9008,\n  \"status\": \"processing\",\n  \"total\": \"67.50\",\n  \"currency\": \"EUR\",\n  \"date_modified\": \"2026-05-07T12:00:00\",\n  \"date_paid\": \"2026-05-07T12:00:00\",\n  \"billing\": {\n    \"first_name\": \"Lucía\",\n    \"last_name\": \"Fernández\",\n    \"email\": \"lucia.fernandez@example.com\",\n    \"phone\": \"+34 600 222 333\"\n  },\n  \"shipping\": {\n    \"first_name\": \"Lucía\",\n    \"last_name\": \"Fernández\",\n    \"address_1\": \"Calle Mayor 12, 3º B\",\n    \"city\": \"Sevilla\",\n    \"state\": \"Sevilla\",\n    \"phone\": \"\"\n  },\n  \"line_items\": [\n    { \"name\": \"Auriculares Bluetooth Pro\", \"quantity\": 1, \"sku\": \"AUR-BT-PRO\" },\n    { \"name\": \"Funda silicona iPhone 15\", \"quantity\": 2, \"sku\": \"FUN-IP15\" }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
       "name": "3. Pedido Pendiente (Ignorado)",
       "request": {
         "method": "POST",
@@ -93,6 +112,24 @@
         "body": {
           "mode": "raw",
           "raw": "{\n  \"id\": \"00000000000000000000000000000001\",\n  \"type\": \"charge.failed\",\n  \"livemode\": false,\n  \"accountId\": \"00000000-0000-0000-0000-000000000000\",\n  \"objectType\": \"charge\",\n  \"objectId\": \"0000000000000000000000000000000000000001\",\n  \"createdAt\": 1700000100,\n  \"object\": {\n    \"id\": \"0000000000000000000000000000000000000001\",\n    \"amount\": 2480,\n    \"currency\": \"EUR\",\n    \"customer\": {\n      \"phone\": \"+340000000000\",\n      \"name\": \"Cliente Ejemplo\",\n      \"email\": \"cliente@example.com\"\n    },\n    \"orderId\": \"000000000001\",\n    \"paymentMethod\": {\n      \"method\": \"card\",\n      \"card\": {\n        \"country\": \"ES\",\n        \"last4\": \"0000\",\n        \"type\": \"credit\",\n        \"brand\": \"visa\"\n      }\n    },\n    \"shop\": { \"country\": \"ES\", \"name\": \"mitienda\" },\n    \"status\": \"FAILED\",\n    \"statusCode\": \"E101\",\n    \"statusMessage\": \"Insufficient funds\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
+      "name": "4c. Pago Bizum (Monei)",
+      "description": "charge.succeeded con paymentMethod.method=bizum. El embed debe mostrar 'Bizum (IBAN ····0000)' en el campo Método (no 'Desconocida (Desconocido)').",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"00000000000000000000000000000002\",\n  \"type\": \"charge.succeeded\",\n  \"livemode\": false,\n  \"accountId\": \"00000000-0000-0000-0000-000000000000\",\n  \"objectType\": \"charge\",\n  \"objectId\": \"0000000000000000000000000000000000000002\",\n  \"createdAt\": 1700000200,\n  \"object\": {\n    \"id\": \"0000000000000000000000000000000000000002\",\n    \"amount\": 1000,\n    \"currency\": \"EUR\",\n    \"customer\": {\n      \"phone\": \"+340000000000\",\n      \"name\": \"Cliente Bizum\",\n      \"email\": \"cliente@example.com\"\n    },\n    \"orderId\": \"000000000002\",\n    \"paymentMethod\": {\n      \"method\": \"bizum\",\n      \"bizum\": {\n        \"remember\": true,\n        \"phoneNumber\": \"+340000000000\",\n        \"integrationType\": \"REST\",\n        \"idBizum\": \"00000000000000000000000000000000000\",\n        \"ibanLast4\": \"0000\"\n      }\n    },\n    \"shop\": { \"country\": \"ES\", \"name\": \"mitienda\" },\n    \"status\": \"SUCCEEDED\",\n    \"statusCode\": \"E000\",\n    \"statusMessage\": \"Transaction approved\"\n  }\n}"
         },
         "url": {
           "raw": "{{cloud_function_url}}",
