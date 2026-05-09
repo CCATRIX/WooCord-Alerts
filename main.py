@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import logging
 import os
+from datetime import datetime
 
 import requests
 
@@ -16,6 +17,10 @@ MONEI_WEBHOOK_SECRET = os.environ.get("MONEI_WEBHOOK_SECRET")
 
 DISCORD_FIELD_LIMIT = 1024
 DISCORD_TIMEOUT = 10
+# Ventana entre `date_paid` y `date_modified` para considerar un `order.updated`
+# como la transición real `pending → processing`. Por encima de esto se asume
+# que es una edición posterior de plugins (YayCurrency, ERP, stock).
+ORDER_PAYMENT_WINDOW_SECONDS = 60
 
 # ==========================================
 # 1. VERIFICACIÓN DE FIRMA (HMAC)
@@ -104,8 +109,37 @@ def _build_product_block(line_items):
     return fence_open + "\n".join(accepted) + fence_close
 
 
+def _parse_wc_datetime(value):
+    """Parsea un timestamp ISO de WooCommerce (`2026-05-07T13:11:36`, sin zona).
+    Devuelve `datetime` naïve o `None` si el valor falta o es inválido."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def format_order_processing(data):
     if data.get("status") != "processing":
+        return None
+
+    # Solo notificar pedidos nacidos del frontend. Descarta los creados por
+    # admin manual (`admin`), REST API externa (`rest-api`) o renovación de
+    # suscripción (`subscription`) — esos no son ventas online accionables.
+    if data.get("created_via") != "checkout":
+        return None
+
+    # Heurística anti-duplicados: comparamos `date_paid_gmt` con
+    # `date_modified_gmt`. Si están cerca (≤ ORDER_PAYMENT_WINDOW_SECONDS) es
+    # la transición real a `processing` justo tras el cobro. Si están lejos,
+    # es un `order.updated` posterior disparado por plugins que tocan la orden
+    # en background (YayCurrency sincronizando tasas, ERPs, plugins de stock).
+    date_paid = _parse_wc_datetime(data.get("date_paid_gmt") or data.get("date_paid"))
+    if not date_paid:
+        return None
+    date_modified = _parse_wc_datetime(data.get("date_modified_gmt") or data.get("date_modified"))
+    if date_modified and abs((date_modified - date_paid).total_seconds()) > ORDER_PAYMENT_WINDOW_SECONDS:
         return None
 
     order_id = data.get("id", "N/A")

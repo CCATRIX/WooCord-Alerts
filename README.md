@@ -7,6 +7,8 @@ Una función Serverless (Google Cloud Functions) escrita en **Python** que inter
 * **Enrutamiento Inteligente:** Separa las notificaciones. Los pedidos van a un canal (ej. `#pedidos`) y los pagos a otro (ej. `#finanzas`).
 * **Soporte Nativo para WooCommerce:** Lee webhooks de `customer.created`, `order.created` y `order.updated`.
 * **Filtro de Estados:** Solo notifica pedidos cuando cambian al estado `processing` para evitar spam con pedidos pendientes o fallidos.
+* **Solo ventas online reales:** Filtra pedidos por `created_via == "checkout"` y exige `date_paid` registrado, descartando borradores manuales, llamadas REST API y renovaciones automáticas.
+* **Deduplicación temporal:** Solo procesa el `order.updated` que ocurre cerca del momento del pago, ignorando ediciones posteriores de plugins (YayCurrency, ERP, stock) que disparan `order.updated` en background.
 * **Módulo de Pasarelas de Pago:** Formateador integrado para notificaciones directas desde pasarelas de pago (actualmente soporta Monei).
 * **Manejo del "Ping":** Responde automáticamente con `200 OK` a los pings de verificación de WooCommerce para permitir la creación fácil de webhooks.
 
@@ -42,15 +44,13 @@ Una función Serverless (Google Cloud Functions) escrita en **Python** que inter
 
 > ⚠️ **Nota sobre notificaciones duplicadas (`order.updated`)**
 >
-> Puede ocurrir que WooCommerce envíe notificaciones duplicadas porque plugins secundarios (como **YayCurrency**, conversores de divisa, plugins de stock, sincronizadores de ERP, etc.) actualizan datos internos del pedido en segundo plano, lo que dispara repetidamente el evento `order.updated`. Esto puede provocar que tu canal de Discord se llene de mensajes spam idénticos por cada pequeña modificación automática que sufra la compra mientras siga en estado `processing`.
+> WooCommerce dispara `order.updated` cada vez que algún plugin toca la orden, por lo que un mismo pedido en estado `processing` puede generar varios webhooks: el primero al confirmar el pago y los siguientes cuando plugins en background (**YayCurrency**, conversores de divisa, sincronizadores de stock o ERP, etc.) actualizan meta-datos minutos después.
 >
-> **Solución de raíz:** en los ajustes del webhook de WooCommerce, en lugar de seleccionar el tema *Pedido actualizado*, cambia el **Tema** a **Acción Personalizada** (*Custom Action*) y escribe:
+> **Cómo lo resuelve este código:** `format_order_processing` solo procesa el webhook cuyo `date_modified` está dentro de **±60 segundos** de `date_paid`. La transición real `pending → processing` ocurre en el mismo instante que el cobro; cualquier modificación posterior cae fuera de esa ventana y se descarta silenciosamente. La constante `ORDER_PAYMENT_WINDOW_SECONDS` en `main.py` permite ajustar la tolerancia.
 >
-> ```
-> woocommerce_order_status_processing
-> ```
+> Adicionalmente se exige `created_via == "checkout"` y `date_paid` no nulo, así no se notifican pedidos creados a mano desde el admin, vía REST API ni renovaciones automáticas de suscripciones.
 >
-> Así el aviso se enviará **una única vez**, justo en el instante en que el pedido alcanza el estado `processing`, ignorando cualquier actualización posterior provocada por otros plugins.
+> **Configuración recomendada en WooCommerce:** un único webhook con tema **Pedido actualizado** (`order.updated`) apuntando a la Cloud Function. Ya no hace falta el workaround histórico de "Acción Personalizada" (`woocommerce_order_status_processing`): su payload solo contiene `{action, arg}` sin datos del pedido y por tanto no puede formatear el embed sin una llamada extra a la REST API.
 
 ## 💳 Configuración en Monei (Opcional)
 
@@ -338,13 +338,22 @@ por `paymentMethod.method` y muestra `Bizum (IBAN ····XXXX)` cuando
 
 ### WooCommerce — `order.updated` con estado `processing` (este sí dispara el embed)
 
+`created_via`, `date_paid_gmt` y `date_modified_gmt` son los tres campos que
+inspecciona el filtro: respectivamente garantizan que es una compra del
+frontend, que el cobro se registró y que el webhook está dentro de la ventana
+de ±60 segundos respecto al pago (descartando ediciones posteriores de
+plugins).
+
 ```json
 {
   "id": 1001,
   "status": "processing",
   "currency": "EUR",
   "total": "6.70",
+  "created_via": "checkout",
   "date_paid": "2026-01-01T12:00:00",
+  "date_paid_gmt": "2026-01-01T12:00:00",
+  "date_modified_gmt": "2026-01-01T12:00:05",
   "customer_id": 100,
   "billing": {
     "first_name": "Nombre",

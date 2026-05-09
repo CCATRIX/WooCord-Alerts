@@ -30,7 +30,13 @@ The Postman collection `WooCommerce_Discord.json` contains anonymized fixtures f
 1. **WooCommerce branch** — triggered by presence of the `X-WC-Webhook-Topic` header.
    - `webhook.ping` short-circuits with `200 OK` so WooCommerce can register the webhook.
    - Topic is looked up in `WC_MAPPER` (`customer.created`, `order.created`, `order.updated`) → formatter function → POST to `DISCORD_WEBHOOK_URL`.
-   - **Order filter:** `format_order_processing` returns `None` for any status other than `processing`, which silently drops `pending`/`failed`/etc. Both `order.created` and `order.updated` route through the same formatter, so a single order typically fires twice and only the `processing` transition surfaces.
+   - **Order filter:** `format_order_processing` returns `None` (silently drops the webhook) unless **all** the following hold:
+     1. `status == "processing"` — drops `pending`/`failed`/`completed`/etc.
+     2. `created_via == "checkout"` — drops admin-created, REST-API-created and subscription-renewal orders. We only notify real online sales.
+     3. `date_paid` (or `date_paid_gmt`) is non-null — confirms the gateway registered the payment.
+     4. `|date_modified_gmt − date_paid_gmt| ≤ ORDER_PAYMENT_WINDOW_SECONDS` (60s by default) — anti-duplicate heuristic. The real `pending → processing` transition happens in the same instant as the payment; later `order.updated` events come from background plugins (YayCurrency syncing rates, ERPs, stock plugins) that touch the order minutes later and fall outside the window.
+   - Both `order.created` and `order.updated` route through the same formatter. `order.created` is normally rejected by check (1) since new orders start in `pending`; the surviving event is the `order.updated` that flips status to `processing`, and only the first one (within the time window) passes.
+   - The historical workaround of subscribing to a "Custom Action" topic (`action.woocommerce_order_status_processing`) is still wired in `WC_MAPPER` for backwards compatibility, but it ships only `{action, arg}` and lacks every field the filter requires, so it is silently rejected. Use `order.updated` instead.
 
 2. **Payment-gateway branch** — fallback when no WC header is present. Detected by payload shape: `payload.type` must be a key in `MONEI_FORMATTERS` AND `payload.accountId` must be present (the `accountId` check disambiguates from other gateways that also use `charge.succeeded` event names, e.g. Stripe). Parsed → formatted → POST to `DISCORD_WEBHOOK_PAGOS`.
 
