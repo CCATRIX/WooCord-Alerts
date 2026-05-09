@@ -30,7 +30,8 @@
       }
     },
     {
-      "name": "2. Pedido Procesando (WC)",
+      "name": "2. Pedido Procesando (WC) — válido",
+      "description": "Webhook `order.updated` con la transición real `pending → processing`: `created_via=checkout`, `date_paid` registrado y `date_modified_gmt` a 5s del `date_paid_gmt`. Pasa los tres filtros y publica el embed en Discord.",
       "request": {
         "method": "POST",
         "header": [
@@ -39,7 +40,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"id\": 9005,\n  \"status\": \"processing\",\n  \"total\": \"299.99\",\n  \"currency\": \"EUR\",\n  \"date_modified\": \"2026-05-04T15:30:00\",\n  \"billing\": {\n    \"first_name\": \"Carlos\",\n    \"last_name\": \"Ruiz\",\n    \"email\": \"carlos.ruiz@example.com\",\n    \"phone\": \"+34 600 000 000\"\n  },\n  \"shipping\": {\n    \"first_name\": \"María\",\n    \"last_name\": \"Ruiz\",\n    \"address_1\": \"Av. Principal 45, Piso 2\",\n    \"city\": \"Madrid\",\n    \"state\": \"Madrid\",\n    \"phone\": \"\"\n  },\n  \"line_items\": [\n    { \"name\": \"Monitor 4K 27 pulgadas\", \"quantity\": 1, \"sku\": \"MON-4K-27\" }\n  ]\n}"
+          "raw": "{\n  \"id\": 9005,\n  \"status\": \"processing\",\n  \"total\": \"299.99\",\n  \"currency\": \"EUR\",\n  \"created_via\": \"checkout\",\n  \"date_paid\": \"2026-05-07T15:11:31\",\n  \"date_paid_gmt\": \"2026-05-07T13:11:31\",\n  \"date_modified\": \"2026-05-07T15:11:36\",\n  \"date_modified_gmt\": \"2026-05-07T13:11:36\",\n  \"billing\": {\n    \"first_name\": \"Carlos\",\n    \"last_name\": \"Ruiz\",\n    \"email\": \"carlos.ruiz@example.com\",\n    \"phone\": \"+34 600 000 000\"\n  },\n  \"shipping\": {\n    \"first_name\": \"María\",\n    \"last_name\": \"Ruiz\",\n    \"address_1\": \"Av. Principal 45, Piso 2\",\n    \"city\": \"Madrid\",\n    \"state\": \"Madrid\",\n    \"phone\": \"\"\n  },\n  \"line_items\": [\n    {\n      \"name\": \"Monitor 4K 27 pulgadas\",\n      \"quantity\": 1,\n      \"sku\": \"MON-4K-27\"\n    }\n  ]\n}"
         },
         "url": {
           "raw": "{{cloud_function_url}}",
@@ -59,6 +60,25 @@
         "body": {
           "mode": "raw",
           "raw": "{\n  \"id\": 9008,\n  \"status\": \"processing\",\n  \"total\": \"67.50\",\n  \"currency\": \"EUR\",\n  \"date_modified\": \"2026-05-07T12:00:00\",\n  \"date_paid\": \"2026-05-07T12:00:00\",\n  \"billing\": {\n    \"first_name\": \"Lucía\",\n    \"last_name\": \"Fernández\",\n    \"email\": \"lucia.fernandez@example.com\",\n    \"phone\": \"+34 600 222 333\"\n  },\n  \"shipping\": {\n    \"first_name\": \"Lucía\",\n    \"last_name\": \"Fernández\",\n    \"address_1\": \"Calle Mayor 12, 3º B\",\n    \"city\": \"Sevilla\",\n    \"state\": \"Sevilla\",\n    \"phone\": \"\"\n  },\n  \"line_items\": [\n    { \"name\": \"Auriculares Bluetooth Pro\", \"quantity\": 1, \"sku\": \"AUR-BT-PRO\" },\n    { \"name\": \"Funda silicona iPhone 15\", \"quantity\": 2, \"sku\": \"FUN-IP15\" }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{cloud_function_url}}",
+          "host": ["{{cloud_function_url}}"]
+        }
+      }
+    },
+    {
+      "name": "2c. Order.updated duplicado YayCurrency (descartado)",
+      "description": "Mismo pedido que 2 pero con `date_modified_gmt` a 3m 33s del pago — patrón típico de YayCurrency cuando sincroniza la tasa de divisa minutos después del cobro y reescribe meta del pedido. La diferencia supera ORDER_PAYMENT_WINDOW_SECONDS (60s), así que `format_order_processing` lo descarta silenciosamente: HTTP 200 sin publicar en Discord.",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-WC-Webhook-Topic", "value": "order.updated", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 9005,\n  \"status\": \"processing\",\n  \"total\": \"299.99\",\n  \"currency\": \"EUR\",\n  \"created_via\": \"checkout\",\n  \"date_paid\": \"2026-05-07T15:11:31\",\n  \"date_paid_gmt\": \"2026-05-07T13:11:31\",\n  \"date_modified\": \"2026-05-07T15:15:04\",\n  \"date_modified_gmt\": \"2026-05-07T13:15:04\",\n  \"billing\": {\n    \"first_name\": \"Carlos\",\n    \"last_name\": \"Ruiz\",\n    \"email\": \"carlos.ruiz@example.com\",\n    \"phone\": \"+34 600 000 000\"\n  },\n  \"shipping\": {\n    \"first_name\": \"María\",\n    \"last_name\": \"Ruiz\",\n    \"address_1\": \"Av. Principal 45, Piso 2\",\n    \"city\": \"Madrid\",\n    \"state\": \"Madrid\",\n    \"phone\": \"\"\n  },\n  \"line_items\": [\n    {\n      \"name\": \"Monitor 4K 27 pulgadas\",\n      \"quantity\": 1,\n      \"sku\": \"MON-4K-27\"\n    }\n  ],\n  \"meta_data\": [\n    {\n      \"key\": \"_yay_currency_order_synced\",\n      \"value\": \"yes\"\n    }\n  ]\n}"
         },
         "url": {
           "raw": "{{cloud_function_url}}",
